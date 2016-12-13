@@ -20,11 +20,17 @@ def affine_forward(x, w, b):
   - cache: (x, w, b)
   """
   out = None
+  num_inputs = x.shape[0]
   #############################################################################
   # TODO: Implement the affine forward pass. Store the result in out. You     #
   # will need to reshape the input into rows.                                 #
   #############################################################################
-  pass
+  
+  # Reshape x in to rows: x (N, k)
+  x = x.reshape(num_inputs, -1)
+  
+  # Get the score
+  out = x.dot(w) + b
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
