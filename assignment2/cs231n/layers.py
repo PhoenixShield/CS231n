@@ -26,11 +26,7 @@ def affine_forward(x, w, b):
   # will need to reshape the input into rows.                                 #
   #############################################################################
   
-  # Reshape x in to rows: x (N, k)
-  x = x.reshape(num_inputs, -1)
-  
-  # Get the score
-  out = x.dot(w) + b
+  out = x.reshape(x.shape[0], w.shape[0]).dot(w) + b
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -58,7 +54,9 @@ def affine_backward(dout, cache):
   #############################################################################
   # TODO: Implement the affine backward pass.                                 #
   #############################################################################
-  pass
+  dw = x.reshape(x.shape[0], w.shape[0]).T.dot(dout)
+  db = np.sum(dout, axis=0)
+  dx = dout.dot(w.T).reshape(x.shape)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
