@@ -34,6 +34,8 @@ class ThreeLayerConvNet(object):
     - dtype: numpy datatype to use for computation.
     """
     self.params = {}
+    self.conv_params = {}
+    self.pool_param = {}
     self.reg = reg
     self.dtype = dtype
     
@@ -47,7 +49,33 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
-    pass
+    # (N,Ch,H,W)->conv->(N,F,Hc,Wc)->rl
+    # ->mp->(N,F,Hp,Wp)
+    # ->af:*(F*Hp*Wp,hd)->rl->af:*(hd,Cl)->(N,Cl)
+    
+    Ch, H, W, F = input_dim[0], input_dim[1], input_dim[2], num_filters
+    # Initialize the weight 1 and b 1
+    self.params['W1'] = weight_scale * np.random.randn(F, Ch, filter_size, filter_size)
+    self.params['b1'] = np.zeros(F)
+    
+    # Compute param sizes of 1st affine, size after conv
+    self.conv_param = { 'stride': 1, 'pad': (filter_size-1)/2 }
+    self.pool_param = { 'pool_height': 2, 'pool_width': 2, 'stride': 2 }
+    cstride, cpad = self.conv_param['stride'], self.conv_param['pad']
+    Wc = ( W+2*cpad-filter_size ) / cstride + 1 # weight after conv
+    Hc = ( H+2*cpad-filter_size ) / cstride + 1 # height after conv
+    # Size after pool
+    ph, pw, pstride = self.pool_param['pool_height'], self.pool_param['pool_width'], self.pool_param['stride']
+    Hp = (Hc-ph) / pstride + 1 # height after pool
+    Wp = (Wc-pw) / pstride + 1 # weight after pool
+    # init params of 1st affine
+    self.params['W2'] = weight_scale * np.random.randn(F*Hp*Wp, hidden_dim)
+    self.params['b2'] = np.zeros(hidden_dim)
+    
+    # init params of hidden layer
+    self.params['W3'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+    self.params['b3'] = np.zeros(num_classes)
+    
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -79,7 +107,18 @@ class ThreeLayerConvNet(object):
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    pass
+    caches = []
+    reg = self.reg
+    
+    # (N,Ch,H,W)->conv->(N,F,Hc,Wc)->rl->mp->(N,F,Hp,Wp)
+    out, cache = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
+    caches.append(cache)
+    # ->af:*(F*Hp*Wp,hd)->rl->(F*Hp*Wp,hd)
+    out, cache = affine_relu_forward(out, W2, b2)
+    caches.append(cache)
+    # ->af:*(hd,Cl)->(N,Cl)->softmax->(N,Cl)
+    scores, cache = affine_forward(out, W3, b3)
+    caches.append(cache)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -94,7 +133,16 @@ class ThreeLayerConvNet(object):
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
-    pass
+    loss, dout = softmax_loss(scores, y)
+    loss += np.sum(0.5*reg*np.sum(w) for w in [W1, W2, W3])
+    
+    dout, dW3, db3 = affine_backward(dout, caches.pop())
+    dout, dW2, db2 = affine_relu_backward(dout, caches.pop())
+    _, dW1, db1 = conv_relu_pool_backward(dout, caches.pop())
+    
+    grads['W1'], grads['b1'] = dW1+reg*W1, db1                  # regularization
+    grads['W2'], grads['b2'] = dW2+reg*W2, db2                  # regularization
+    grads['W3'], grads['b3'] = dW3+reg*W3, db3                  # regularization
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
